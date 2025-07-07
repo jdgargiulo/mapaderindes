@@ -15,7 +15,11 @@ instalar_paquetes<-function(){
           install.packages("automap")
           install.packages("spdep")
           install.packages("spdep")
-              
+	  install.packages("sf")
+	  install.package("dlpyr")	
+	
+	
+        
           require(sp)
           require(gstat)
           require(maptools)
@@ -23,6 +27,8 @@ instalar_paquetes<-function(){
           require(raster)
           require(rgdal)
           require(spdep)
+	  require(sf)
+	require(dplyr)
 }
 
 listar_archivos<-function(){
@@ -33,36 +39,80 @@ listar_archivos<-function(){
           print(lista1)
 }
 
-ingresar_datos<-function(indicador_archivos,variable){
-        ruta_datos<-paste(getwd(),"/",lista1$lista[indicador_archivos],sep="") 
-        myshp <- readOGR(ruta_datos,use_iconv=TRUE, encoding = "UTF-8")  
-        #myshp <- readOGR(ruta_datos,stringsAsFactors=FALSE)
-        myshp@data[variable]<-as.numeric(as.character(unlist(c(myshp@data[variable]))))
-        proj4string(myshp) <- CRS("+init=epsg:4326")
-        #reproyecto a metros pseudo mercator
-        myshp <- spTransform(myshp, CRS("+init=epsg:3857"))
-        #me quedo con la columna de Rinde.
-        drops<-c(variable)
-        myshp1 <- myshp[,(names(myshp) %in% drops)]
-               
-       colnames(myshp1@data)<-"Rinde"
-       print(spplot(myshp1["Rinde"]))
-       datos2<<-myshp1
+ingresar_datos <- function(indicador_archivos, variable) {
+  # Construye la ruta al archivo
+  ruta_datos <- paste0(getwd(), "/", lista1$lista[indicador_archivos])
 
+  # Lee el archivo espacial usando st_read
+  # st_read detecta automáticamente el sistema de coordenadas (CRS)
+  myshp_sf <- st_read(ruta_datos, options = "ENCODING=UTF-8", quiet = TRUE)
+
+  # Asegura que la columna de la variable sea numérica
+  # Usamos el operador $ para acceder directamente a la columna
+  myshp_sf[[variable]] <- as.numeric(as.character(myshp_sf[[variable]]))
+
+  # Reproyecta a EPSG:3857 (Pseudo-Mercator) si el CRS original no es 4326
+  # st_transform solo reproyecta si es necesario, de lo contrario devuelve el mismo objeto
+  if (st_crs(myshp_sf)$epsg != 4326) {
+    myshp_sf <- st_transform(myshp_sf, 4326) # Primero a WGS84 si no lo está
+  }
+  myshp_sf <- st_transform(myshp_sf, 3857) # Luego a Pseudo-Mercator
+
+  # Selecciona la columna de interés y la renombra a "Rinde"
+  # st_sf es un dataframe, por lo que podemos usar select y rename
+  myshp_sf_rinde <- myshp_sf %>%
+    dplyr::select(!!sym(variable)) %>% # Selecciona la columna usando quasiquotation
+    dplyr::rename(Rinde = !!sym(variable)) # Renombra la columna
+
+  # Imprime el mapa usando plot de sf (o tmap/ggplot2 para más opciones)
+  # plot(myshp_sf_rinde) es la forma básica. Para opciones similares a spplot:
+  print(plot(myshp_sf_rinde["Rinde"], main = "Mapa de Rinde"))
+
+  # Asigna el objeto sf resultante a una variable global (considera alternativas)
+  datos2 <<- myshp_sf_rinde
 }
 
-importar_poligono<-function(indicador_archivos){
-      ruta_datos<-paste(getwd(),"/",lista1$lista[indicador_archivos],sep="")  
-      poligono<-readShapePoly(ruta_datos)
-      proj4string(poligono) <- CRS("+init=epsg:4326")
-      poligono <- spTransform(poligono, CRS("+init=epsg:3857"))
-      Poligono<<-poligono
-      grdpts <- makegrid(poligono, cellsize = 2)
-      spgrd <- SpatialPoints(grdpts, proj4string = CRS(proj4string(poligono)))
-      spgrdWithin <- SpatialPixels(spgrd[poligono,])
-      par(mfrow= c(1,1))
-      plot(spgrdWithin,col = "red", pch = 10, cex = 0.2,xlab="X",ylab="Y")
-      gri<<-spgrdWithin
+Okay, let's adapt your importar_poligono function to use the sf package in R, and also integrate sf's approach for creating a grid within the polygon.
+
+R
+
+library(sf)
+library(dplyr) # Useful for data manipulation with sf
+
+importar_poligono <- function(indicador_archivos) {
+  # Construct the path to the file
+  ruta_datos <- paste0(getwd(), "/", lista1$lista[indicador_archivos])
+
+  # Read the spatial file using st_read
+  # st_read automatically detects the CRS
+  poligono_sf <- st_read(ruta_datos, options = "ENCODING=UTF-8", quiet = TRUE)
+
+  # Reproject to EPSG:3857 (Pseudo-Mercator)
+  # First, ensure it's in WGS84 if it isn't already, then transform to 3857
+  if (st_crs(poligono_sf)$epsg != 4326) {
+    poligono_sf <- st_transform(poligono_sf, 4326) # To WGS84
+  }
+  poligono_sf <- st_transform(poligono_sf, 3857) # To Pseudo-Mercator
+
+  # Assign the sf object to a global variable (consider returning it instead)
+  Poligono <<- poligono_sf
+
+  # Create a grid within the polygon using sf's st_make_grid
+  # The cellsize argument is in the units of the CRS (meters for EPSG:3857)
+  # st_filter is used to keep only grid cells that intersect the polygon
+  grid_sf <- st_make_grid(poligono_sf, cellsize = 2, what = "centers") %>%
+    st_filter(poligono_sf)
+
+  # Assign the grid to a global variable
+  gri <<- grid_sf
+
+  # Plot the grid and the polygon using sf's plot method
+  # plot(grid_sf) will show the points
+  # You can overlay the polygon for context
+  plot(grid_sf, col = "red", pch = 10, cex = 0.2, xlab = "X", ylab = "Y",
+       main = "Puntos de Grilla dentro del Polígono")
+  plot(poligono_sf, border = "blue", add = TRUE) # Add the polygon outline
+
 }
 
 
