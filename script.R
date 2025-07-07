@@ -72,12 +72,6 @@ ingresar_datos <- function(indicador_archivos, variable) {
   datos2 <<- myshp_sf_rinde
 }
 
-Okay, let's adapt your importar_poligono function to use the sf package in R, and also integrate sf's approach for creating a grid within the polygon.
-
-R
-
-library(sf)
-library(dplyr) # Useful for data manipulation with sf
 
 importar_poligono <- function(indicador_archivos) {
   # Construct the path to the file
