@@ -22,10 +22,10 @@ instalar_paquetes<-function(){
         
           require(sp)
           require(gstat)
-          require(maptools)
-          require(rgeos)
+          #require(maptools)
+          #require(rgeos)
           require(raster)
-          require(rgdal)
+          #require(rgdal)
           require(spdep)
 	  require(sf)
 	  require(dplyr)
