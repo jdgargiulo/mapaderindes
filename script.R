@@ -16,7 +16,7 @@ instalar_paquetes<-function(){
           install.packages("spdep")
           install.packages("spdep")
 	  install.packages("sf")
-	  install.package("dlpyr")	
+	  install.packages("dlpyr")	
 	
 	
         
@@ -28,7 +28,7 @@ instalar_paquetes<-function(){
           require(rgdal)
           require(spdep)
 	  require(sf)
-	require(dplyr)
+	  require(dplyr)
 }
 
 listar_archivos<-function(){
