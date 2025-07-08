@@ -16,7 +16,7 @@ instalar_paquetes<-function(){
           install.packages("spdep")
           install.packages("spdep")
 	  install.packages("sf")
-	  install.packages("dlpyr")	
+	  install.packages("dplyr")	
 	
 	
         
